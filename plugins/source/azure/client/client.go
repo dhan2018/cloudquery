@@ -2,10 +2,14 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"strconv"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/services/subscription/mgmt/2020-09-01/subscription"
+
 	// Import all autorest modules
 	_ "github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -21,6 +25,7 @@ type Client struct {
 	logger        hclog.Logger
 	// this is set by table client multiplexer
 	SubscriptionId string
+	orgId          int
 }
 
 func NewAzureClient(log hclog.Logger, subscriptionId []string) *Client {
@@ -52,6 +57,7 @@ func (c Client) withSubscription(subscriptionId string) *Client {
 		services:       c.services,
 		logger:         c.logger.With("subscription_id", subscriptionId),
 		SubscriptionId: subscriptionId,
+		orgId:          c.orgId,
 	}
 }
 
@@ -62,11 +68,20 @@ func Configure(logger hclog.Logger, config interface{}) (schema.ClientMeta, diag
 	//  1. Environment
 	//  2. AzureCLI
 	logger.Info("Trying to authenticate via environment variables")
+	creds, err := auth.GetSettingsFromEnvironment()
+	creds_json, err := json.Marshal(creds.Values)
+	logger.Info(string(creds_json))
+	logger.Info("dumping error")
+	if err != nil {
+		logger.Error(err.Error())
+	}
 	azureAuth, err := auth.NewAuthorizerFromEnvironment()
 	if err != nil {
+		logger.Error(err.Error())
 		logger.Info("Trying to authenticate via CLI")
 		azureAuth, err = auth.NewAuthorizerFromCLI()
 		if err != nil {
+			logger.Error(err.Error())
 			return nil, diag.FromError(err, diag.USER)
 		}
 	}
@@ -80,7 +95,20 @@ func Configure(logger hclog.Logger, config interface{}) (schema.ClientMeta, diag
 		return nil, diag.FromError(err, diag.USER)
 	}
 
+	orgIdStr := os.Getenv("ORG_ID")
+	if orgIdStr == "" {
+		logger.Error("ORG_ID environment variable is not set.")
+		return nil, diag.FromError(err, diag.USER)
+	}
+	orgId, err := strconv.Atoi(orgIdStr)
+	if err != nil {
+		logger.Error("ORG_ID environment variable is not a valid integer.")
+		return nil, diag.FromError(err, diag.USER)
+	}
+	logger.Info("Org Id is", "org_id_str", orgIdStr, "org_id", orgId)
 	client := NewAzureClient(logger, providerConfig.Subscriptions)
+	client.orgId = orgId
+	logger.Info("client.orgId", "org_id", client.orgId)
 
 	if len(providerConfig.Subscriptions) == 0 {
 		ctx := context.Background()

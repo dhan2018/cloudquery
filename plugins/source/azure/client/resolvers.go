@@ -10,3 +10,8 @@ func ResolveAzureSubscription(_ context.Context, meta schema.ClientMeta, r *sche
 	cl := meta.(*Client)
 	return r.Set("subscription_id", cl.SubscriptionId)
 }
+
+func ResolveOrgId(_ context.Context, meta schema.ClientMeta, r *schema.Resource, _ schema.Column) error {
+	cl := meta.(*Client)
+	return r.Set("org_id", cl.orgId)
+}
