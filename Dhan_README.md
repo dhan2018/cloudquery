@@ -33,7 +33,8 @@ make build
  ls -al bin/
 
  # copy all the latest cloudquery binaries to the finops folder
- mkdir -p ../finops/bin/cq
+mkdir -p ../finops/bin/cq
+cp bin/* ../finops/bin/cq/
 ls -al /home/finopsroot/code/finops/bin/cq/  # Verify all the binaries are copied correctly
 
 
